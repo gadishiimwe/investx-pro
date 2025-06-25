@@ -16,12 +16,11 @@ import {
   Users, 
   Package, 
   DollarSign, 
-  ArrowUpRight, 
   Shield,
   LogOut,
   Check,
   X,
-  Edit
+  RefreshCw
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/integrations/supabase/client';
@@ -87,20 +86,32 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     try {
-      // Fetch all users
-      const { data: usersData } = await supabase
+      setLoading(true);
+      
+      // Use service_role key or create a function to bypass RLS for admin
+      // For now, let's try to fetch with a different approach
+      console.log('Fetching admin data...');
+      
+      // Fetch all users - we need to use a different approach for admin access
+      const { data: usersData, error: usersError } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
+      console.log('Users data:', usersData);
+      console.log('Users error:', usersError);
+
       // Fetch all packages
-      const { data: packagesData } = await supabase
+      const { data: packagesData, error: packagesError } = await supabase
         .from('investment_packages')
         .select('*')
         .order('created_at', { ascending: false });
 
+      console.log('Packages data:', packagesData);
+      console.log('Packages error:', packagesError);
+
       // Fetch withdrawal requests with proper foreign key specification
-      const { data: withdrawalsData } = await supabase
+      const { data: withdrawalsData, error: withdrawalsError } = await supabase
         .from('withdrawal_requests')
         .select(`
           *,
@@ -108,11 +119,27 @@ const AdminDashboard = () => {
         `)
         .order('requested_at', { ascending: false });
 
+      console.log('Withdrawals data:', withdrawalsData);
+      console.log('Withdrawals error:', withdrawalsError);
+
       setUsers(usersData || []);
       setPackages(packagesData || []);
       setWithdrawals(withdrawalsData || []);
+
+      if (usersError || packagesError || withdrawalsError) {
+        toast({
+          title: "Data Fetch Warning",
+          description: "Some data might not be visible due to permissions. Check console for details.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch dashboard data. Check console for details.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -313,10 +340,16 @@ const AdminDashboard = () => {
               <Shield className="h-8 w-8 text-red-600 mr-2" />
               <h1 className="text-xl font-bold text-gray-900">InvestX Admin</h1>
             </div>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
+            <div className="flex items-center space-x-4">
+              <Button variant="outline" size="sm" onClick={fetchData}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -365,6 +398,29 @@ const AdminDashboard = () => {
           </Card>
         </div>
 
+        {/* Debug Information */}
+        {users.length === 0 && (
+          <Card className="mb-6 border-orange-200 bg-orange-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center space-x-2 text-orange-800">
+                <Users className="h-5 w-5" />
+                <span className="font-medium">No users found in database</span>
+              </div>
+              <p className="text-sm text-orange-700 mt-2">
+                This could be due to:
+              </p>
+              <ul className="text-sm text-orange-700 mt-1 ml-4 list-disc">
+                <li>No users have registered yet</li>
+                <li>RLS policies preventing admin access to user data</li>
+                <li>Database connection issues</li>
+              </ul>
+              <p className="text-sm text-orange-700 mt-2">
+                Check the browser console for detailed error messages.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tab Navigation */}
         <div className="mb-6">
           <div className="flex space-x-4">
@@ -386,45 +442,63 @@ const AdminDashboard = () => {
           <Card>
             <CardHeader>
               <CardTitle>User Management</CardTitle>
-              <CardDescription>Manage user accounts and activations</CardDescription>
+              <CardDescription>
+                Manage user accounts and activations. Users need admin approval before they can access the platform.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Wallet Balance</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Registered</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{user.first_name} {user.last_name}</TableCell>
-                      <TableCell>{user.phone}</TableCell>
-                      <TableCell>{user.wallet_balance.toLocaleString()} RWF</TableCell>
-                      <TableCell>
-                        <Badge variant={user.is_active ? 'default' : 'secondary'}>
-                          {user.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant={user.is_active ? 'destructive' : 'default'}
-                          onClick={() => handleUserActivation(user.id, !user.is_active)}
-                        >
-                          {user.is_active ? 'Deactivate' : 'Activate'}
-                        </Button>
-                      </TableCell>
+              {users.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Referral Code</TableHead>
+                      <TableHead>Wallet Balance</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Registered</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">
+                          {user.first_name} {user.last_name}
+                        </TableCell>
+                        <TableCell>{user.phone}</TableCell>
+                        <TableCell>
+                          <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                            {user.referral_code}
+                          </code>
+                        </TableCell>
+                        <TableCell>{user.wallet_balance.toLocaleString()} RWF</TableCell>
+                        <TableCell>
+                          <Badge variant={user.is_active ? 'default' : 'secondary'}>
+                            {user.is_active ? 'Active' : 'Pending Approval'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant={user.is_active ? 'destructive' : 'default'}
+                            onClick={() => handleUserActivation(user.id, !user.is_active)}
+                          >
+                            {user.is_active ? 'Deactivate' : 'Approve'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No registered users found</p>
+                  <p className="text-sm">New user registrations will appear here</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -532,59 +606,66 @@ const AdminDashboard = () => {
               <CardDescription>Manage user withdrawal requests</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Fee</TableHead>
-                    <TableHead>Net Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Requested</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {withdrawals.map((withdrawal) => (
-                    <TableRow key={withdrawal.id}>
-                      <TableCell>
-                        {withdrawal.profiles.first_name} {withdrawal.profiles.last_name}
-                      </TableCell>
-                      <TableCell>{withdrawal.amount.toLocaleString()} RWF</TableCell>
-                      <TableCell>{withdrawal.fee.toLocaleString()} RWF</TableCell>
-                      <TableCell>{withdrawal.net_amount.toLocaleString()} RWF</TableCell>
-                      <TableCell>
-                        <Badge variant={
-                          withdrawal.status === 'approved' ? 'default' :
-                          withdrawal.status === 'rejected' ? 'destructive' : 'secondary'
-                        }>
-                          {withdrawal.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{new Date(withdrawal.requested_at).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        {withdrawal.status === 'pending' && (
-                          <div className="flex space-x-2">
-                            <Button
-                              size="sm"
-                              onClick={() => handleWithdrawalAction(withdrawal.id, 'approve')}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleWithdrawalAction(withdrawal.id, 'reject')}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
+              {withdrawals.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Fee</TableHead>
+                      <TableHead>Net Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Requested</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {withdrawals.map((withdrawal) => (
+                      <TableRow key={withdrawal.id}>
+                        <TableCell>
+                          {withdrawal.profiles.first_name} {withdrawal.profiles.last_name}
+                        </TableCell>
+                        <TableCell>{withdrawal.amount.toLocaleString()} RWF</TableCell>
+                        <TableCell>{withdrawal.fee.toLocaleString()} RWF</TableCell>
+                        <TableCell>{withdrawal.net_amount.toLocaleString()} RWF</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            withdrawal.status === 'approved' ? 'default' :
+                            withdrawal.status === 'rejected' ? 'destructive' : 'secondary'
+                          }>
+                            {withdrawal.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{new Date(withdrawal.requested_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          {withdrawal.status === 'pending' && (
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleWithdrawalAction(withdrawal.id, 'approve')}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleWithdrawalAction(withdrawal.id, 'reject')}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No withdrawal requests found</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
