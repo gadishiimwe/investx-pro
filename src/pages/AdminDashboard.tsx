@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,12 +99,12 @@ const AdminDashboard = () => {
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Fetch withdrawal requests
+      // Fetch withdrawal requests with proper foreign key specification
       const { data: withdrawalsData } = await supabase
         .from('withdrawal_requests')
         .select(`
           *,
-          profiles (*)
+          profiles!withdrawal_requests_user_id_fkey (*)
         `)
         .order('requested_at', { ascending: false });
 
