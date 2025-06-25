@@ -13,6 +13,9 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
+import HowItWorks from "./pages/HowItWorks";
+import InvestmentPackages from "./pages/InvestmentPackages";
+import FAQ from "./pages/FAQ";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +31,9 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/how-it-works" element={<HowItWorks />} />
+            <Route path="/packages" element={<InvestmentPackages />} />
+            <Route path="/faq" element={<FAQ />} />
             <Route 
               path="/dashboard" 
               element={
@@ -36,6 +42,7 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            <Route path="/admin" element={<AdminLogin />} />
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route 
               path="/admin/dashboard" 
