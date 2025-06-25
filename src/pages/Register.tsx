@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TrendingUp, Eye, EyeOff, Copy } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from "@/hooks/use-toast";
 
 const Register = () => {
@@ -21,8 +22,15 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { signUp, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,19 +44,40 @@ const Register = () => {
       return;
     }
 
+    if (formData.password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const { error } = await signUp(
+        formData.email,
+        formData.password,
+        formData.firstName,
+        formData.lastName,
+        formData.phone,
+        formData.referralCode
+      );
       
-      toast({
-        title: "Registration Successful!",
-        description: "Your account has been created. Please complete payment to activate.",
-      });
-      
-      // Redirect to login with activation message
-      navigate('/login');
+      if (error) {
+        toast({
+          title: "Registration Failed",
+          description: error.message || "Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Registration Successful!",
+          description: "Please check your email to verify your account, then complete the payment process.",
+        });
+        navigate('/login');
+      }
     } catch (error) {
       toast({
         title: "Registration Failed",
@@ -71,7 +100,6 @@ const Register = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center text-2xl font-bold text-gray-900 mb-2">
             <TrendingUp className="h-8 w-8 text-blue-600 mr-2" />
@@ -81,7 +109,6 @@ const Register = () => {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8">
-          {/* Registration Form */}
           <Card>
             <CardHeader>
               <CardTitle>Create Account</CardTitle>
@@ -210,7 +237,6 @@ const Register = () => {
             </CardContent>
           </Card>
 
-          {/* Payment Instructions */}
           <Card>
             <CardHeader>
               <CardTitle>Activation Payment</CardTitle>

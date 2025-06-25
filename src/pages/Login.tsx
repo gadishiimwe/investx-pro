@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TrendingUp, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
@@ -15,41 +16,34 @@ const Login = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { signIn, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await signIn(formData.email, formData.password);
       
-      // For demo purposes, check for admin credentials
-      if (formData.email === 'admin@investx.rw' && formData.password === 'admin123') {
-        localStorage.setItem('userType', 'admin');
-        localStorage.setItem('isAuthenticated', 'true');
+      if (error) {
         toast({
-          title: "Welcome Admin!",
-          description: "Logged in successfully.",
+          title: "Login Failed",
+          description: error.message || "Invalid email or password.",
+          variant: "destructive",
         });
-        navigate('/admin/dashboard');
-      } else {
-        // Regular user login
-        localStorage.setItem('userType', 'user');
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userEmail', formData.email);
-        toast({
-          title: "Welcome back!",
-          description: "Logged in successfully.",
-        });
-        navigate('/dashboard');
       }
     } catch (error) {
       toast({
         title: "Login Failed",
-        description: "Invalid email or password.",
+        description: "Please try again later.",
         variant: "destructive",
       });
     } finally {
@@ -60,7 +54,6 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center text-2xl font-bold text-gray-900 mb-2">
             <TrendingUp className="h-8 w-8 text-blue-600 mr-2" />
@@ -83,7 +76,7 @@ const Login = () => {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder="john@example.com"
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                   required
@@ -126,17 +119,10 @@ const Login = () => {
                 </Link>
               </p>
               <p className="text-sm text-gray-600">
-                <Link to="/admin/login" className="font-medium text-blue-600 hover:text-blue-500">
+                <Link to="/admin/login" className="font-medium text-red-600 hover:text-red-500">
                   Admin Login
                 </Link>
               </p>
-            </div>
-
-            {/* Demo Credentials */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700 mb-2">Demo Credentials:</p>
-              <p className="text-xs text-gray-600">User: user@example.com / password123</p>
-              <p className="text-xs text-gray-600">Admin: admin@investx.rw / admin123</p>
             </div>
           </CardContent>
         </Card>

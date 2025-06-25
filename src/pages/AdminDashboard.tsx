@@ -1,236 +1,330 @@
+
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { 
-  Shield, 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { 
   Users, 
   Package, 
-  Wallet, 
-  TrendingUp,
+  DollarSign, 
+  ArrowUpRight, 
+  Shield,
   LogOut,
   Check,
   X,
-  Plus,
-  Edit,
-  Trash2
+  Edit
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from '@/integrations/supabase/client';
+
+interface Profile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  referral_code: string;
+  wallet_balance: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface InvestmentPackage {
+  id: string;
+  name: string;
+  amount: number;
+  return_amount: number;
+  duration_days: number;
+  max_purchases: number;
+  is_active: boolean;
+}
+
+interface WithdrawalRequest {
+  id: string;
+  user_id: string;
+  amount: number;
+  fee: number;
+  net_amount: number;
+  status: string;
+  requested_at: string;
+  profiles: Profile;
+}
 
 const AdminDashboard = () => {
-  const [stats, setStats] = useState({
-    totalUsers: 156,
-    activeUsers: 89,
-    pendingActivations: 12,
-    totalInvestments: 2850000,
-    pendingWithdrawals: 450000,
-    totalPackages: 3
-  });
+  const { toast } = useToast();
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [packages, setPackages] = useState<InvestmentPackage[]>([]);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('users');
 
-  const [users, setUsers] = useState([
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john@example.com',
-      phone: '+250123456789',
-      walletBalance: 0,
-      totalInvested: 0,
-      isActive: false,
-      joinDate: '2024-01-15',
-      referralCode: 'INV-JD-2024'
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      phone: '+250987654321',
-      walletBalance: 125000,
-      totalInvested: 75000,
-      isActive: true,
-      joinDate: '2024-01-10',
-      referralCode: 'INV-JS-2024'
-    }
-  ]);
-
-  const [packages, setPackages] = useState([
-    {
-      id: 1,
-      name: 'Starter Package',
-      amount: 25000,
-      returnAmount: 30000,
-      duration: 30,
-      maxPurchases: 3,
-      isActive: true
-    },
-    {
-      id: 2,
-      name: 'Gold Package',
-      amount: 50000,
-      returnAmount: 65000,
-      duration: 45,
-      maxPurchases: 3,
-      isActive: true
-    },
-    {
-      id: 3,
-      name: 'Platinum Package',
-      amount: 100000,
-      returnAmount: 135000,
-      duration: 60,
-      maxPurchases: 3,
-      isActive: true
-    }
-  ]);
-
-  const [withdrawals, setWithdrawals] = useState([
-    {
-      id: 1,
-      userId: 2,
-      userName: 'Jane Smith',
-      amount: 50000,
-      fee: 5000,
-      netAmount: 45000,
-      status: 'pending',
-      requestDate: '2024-01-20'
-    }
-  ]);
-
-  const [newPackage, setNewPackage] = useState({
+  // Package form state
+  const [packageForm, setPackageForm] = useState({
     name: '',
     amount: '',
-    returnAmount: '',
-    duration: '',
-    maxPurchases: '3'
+    return_amount: '',
+    duration_days: '',
   });
 
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  // Wallet adjustment form
+  const [walletAdjustment, setWalletAdjustment] = useState({
+    userId: '',
+    amount: '',
+    type: 'add' as 'add' | 'subtract'
+  });
 
   useEffect(() => {
-    // Check if user is authenticated admin
-    const isAuthenticated = localStorage.getItem('isAuthenticated');
-    const userType = localStorage.getItem('userType');
-    if (!isAuthenticated || userType !== 'admin') {
-      navigate('/admin/login');
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      // Fetch all users
+      const { data: usersData } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      // Fetch all packages
+      const { data: packagesData } = await supabase
+        .from('investment_packages')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      // Fetch withdrawal requests
+      const { data: withdrawalsData } = await supabase
+        .from('withdrawal_requests')
+        .select(`
+          *,
+          profiles (*)
+        `)
+        .order('requested_at', { ascending: false });
+
+      setUsers(usersData || []);
+      setPackages(packagesData || []);
+      setWithdrawals(withdrawalsData || []);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [navigate]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userType');
-    navigate('/admin/login');
   };
 
-  const handleUserActivation = (userId: number, activate: boolean) => {
-    setUsers(prev => prev.map(user => 
-      user.id === userId 
-        ? { ...user, isActive: activate, walletBalance: activate ? 5000 : 0 }
-        : user
-    ));
+  const handleUserActivation = async (userId: string, activate: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_active: activate })
+        .eq('id', userId);
 
-    toast({
-      title: activate ? "User Activated" : "User Deactivated",
-      description: activate ? "User account has been activated and 5,000 RWF added to wallet." : "User account has been deactivated.",
-    });
-  };
+      if (error) throw error;
 
-  const handleWalletAdjustment = (userId: number, amount: number) => {
-    setUsers(prev => prev.map(user => 
-      user.id === userId 
-        ? { ...user, walletBalance: Math.max(0, user.walletBalance + amount) }
-        : user
-    ));
+      toast({
+        title: activate ? "User Activated" : "User Deactivated",
+        description: `User has been ${activate ? 'activated' : 'deactivated'} successfully.`,
+      });
 
-    toast({
-      title: "Wallet Updated",
-      description: `${amount > 0 ? 'Added' : 'Deducted'} ${Math.abs(amount).toLocaleString()} RWF ${amount > 0 ? 'to' : 'from'} user wallet.`,
-    });
-  };
-
-  const handleWithdrawalAction = (withdrawalId: number, approve: boolean) => {
-    setWithdrawals(prev => prev.map(withdrawal => 
-      withdrawal.id === withdrawalId 
-        ? { ...withdrawal, status: approve ? 'approved' : 'rejected' }
-        : withdrawal
-    ));
-
-    toast({
-      title: approve ? "Withdrawal Approved" : "Withdrawal Rejected",
-      description: approve ? "Withdrawal has been approved for processing." : "Withdrawal request has been rejected.",
-    });
-  };
-
-  const handleCreatePackage = () => {
-    if (!newPackage.name || !newPackage.amount || !newPackage.returnAmount || !newPackage.duration) {
+      await fetchData();
+    } catch (error) {
+      console.error('Error updating user:', error);
       toast({
         title: "Error",
-        description: "Please fill in all required fields.",
+        description: "Failed to update user status.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleWalletAdjustment = async () => {
+    if (!walletAdjustment.userId || !walletAdjustment.amount) {
+      toast({
+        title: "Invalid Input",
+        description: "Please select a user and enter an amount.",
         variant: "destructive",
       });
       return;
     }
 
-    const packageData = {
-      id: packages.length + 1,
-      name: newPackage.name,
-      amount: parseInt(newPackage.amount),
-      returnAmount: parseInt(newPackage.returnAmount),
-      duration: parseInt(newPackage.duration),
-      maxPurchases: parseInt(newPackage.maxPurchases),
-      isActive: true
-    };
+    try {
+      const user = users.find(u => u.id === walletAdjustment.userId);
+      if (!user) return;
 
-    setPackages(prev => [...prev, packageData]);
-    setNewPackage({ name: '', amount: '', returnAmount: '', duration: '', maxPurchases: '3' });
+      const amount = parseFloat(walletAdjustment.amount);
+      const newBalance = walletAdjustment.type === 'add' 
+        ? user.wallet_balance + amount 
+        : Math.max(0, user.wallet_balance - amount);
 
-    toast({
-      title: "Package Created",
-      description: "New investment package has been created successfully.",
-    });
+      const { error } = await supabase
+        .from('profiles')
+        .update({ wallet_balance: newBalance })
+        .eq('id', walletAdjustment.userId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Wallet Adjusted",
+        description: `User wallet has been ${walletAdjustment.type === 'add' ? 'credited' : 'debited'} with ${amount.toLocaleString()} RWF.`,
+      });
+
+      setWalletAdjustment({ userId: '', amount: '', type: 'add' });
+      await fetchData();
+    } catch (error) {
+      console.error('Error adjusting wallet:', error);
+      toast({
+        title: "Error",
+        description: "Failed to adjust wallet balance.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeletePackage = (packageId: number) => {
-    setPackages(prev => prev.filter(pkg => pkg.id !== packageId));
-    toast({
-      title: "Package Deleted",
-      description: "Investment package has been deleted.",
-    });
+  const handleWithdrawalAction = async (withdrawalId: string, action: 'approve' | 'reject') => {
+    try {
+      const { error } = await supabase
+        .from('withdrawal_requests')
+        .update({ 
+          status: action === 'approve' ? 'approved' : 'rejected',
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', withdrawalId);
+
+      if (error) throw error;
+
+      toast({
+        title: `Withdrawal ${action === 'approve' ? 'Approved' : 'Rejected'}`,
+        description: `The withdrawal request has been ${action}d.`,
+      });
+
+      await fetchData();
+    } catch (error) {
+      console.error('Error processing withdrawal:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process withdrawal request.",
+        variant: "destructive",
+      });
+    }
   };
+
+  const handlePackageCreate = async () => {
+    if (!packageForm.name || !packageForm.amount || !packageForm.return_amount || !packageForm.duration_days) {
+      toast({
+        title: "Invalid Input",
+        description: "Please fill in all package details.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('investment_packages')
+        .insert({
+          name: packageForm.name,
+          amount: parseFloat(packageForm.amount),
+          return_amount: parseFloat(packageForm.return_amount),
+          duration_days: parseInt(packageForm.duration_days),
+          max_purchases: 3
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Package Created",
+        description: "New investment package has been created successfully.",
+      });
+
+      setPackageForm({ name: '', amount: '', return_amount: '', duration_days: '' });
+      await fetchData();
+    } catch (error) {
+      console.error('Error creating package:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create investment package.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePackageToggle = async (packageId: string, isActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('investment_packages')
+        .update({ is_active: !isActive })
+        .eq('id', packageId);
+
+      if (error) throw error;
+
+      toast({
+        title: `Package ${!isActive ? 'Activated' : 'Deactivated'}`,
+        description: `The package has been ${!isActive ? 'activated' : 'deactivated'}.`,
+      });
+
+      await fetchData();
+    } catch (error) {
+      console.error('Error toggling package:', error);
+      toast({
+        title: "Error",
+        description: "Failed to toggle package status.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('userType');
+    localStorage.removeItem('isAuthenticated');
+    window.location.href = '/admin/login';
+  };
+
+  const stats = {
+    totalUsers: users.length,
+    activeUsers: users.filter(u => u.is_active).length,
+    totalPackages: packages.length,
+    pendingWithdrawals: withdrawals.filter(w => w.status === 'pending').length,
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-red-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading admin dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Shield className="h-8 w-8 text-red-600" />
-              <span className="ml-2 text-2xl font-bold text-gray-900">InvestX Admin</span>
+              <Shield className="h-8 w-8 text-red-600 mr-2" />
+              <h1 className="text-xl font-bold text-gray-900">InvestX Admin</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <Badge variant="destructive">Administrator</Badge>
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Message */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600">Manage users, packages, and system operations.</p>
-        </div>
-
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -244,366 +338,317 @@ const AdminDashboard = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-              <Users className="h-4 w-4 text-green-600" />
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.activeUsers}</div>
+              <div className="text-2xl font-bold">{stats.activeUsers}</div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending</CardTitle>
-              <Users className="h-4 w-4 text-yellow-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{stats.pendingActivations}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Invested</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{(stats.totalInvestments / 1000000).toFixed(1)}M</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Withdrawals</CardTitle>
-              <Wallet className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{(stats.pendingWithdrawals / 1000).toFixed(0)}K</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Packages</CardTitle>
+              <CardTitle className="text-sm font-medium">Investment Packages</CardTitle>
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalPackages}</div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending Withdrawals</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.pendingWithdrawals}</div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="users">User Management</TabsTrigger>
-            <TabsTrigger value="packages">Package Management</TabsTrigger>
-            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
-            <TabsTrigger value="system">System Stats</TabsTrigger>
-          </TabsList>
+        {/* Tab Navigation */}
+        <div className="mb-6">
+          <div className="flex space-x-4">
+            {['users', 'packages', 'withdrawals', 'wallet'].map((tab) => (
+              <Button
+                key={tab}
+                variant={activeTab === tab ? 'default' : 'outline'}
+                onClick={() => setActiveTab(tab)}
+                className="capitalize"
+              >
+                {tab}
+              </Button>
+            ))}
+          </div>
+        </div>
 
-          <TabsContent value="users" className="space-y-6">
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>User Management</CardTitle>
+              <CardDescription>Manage user accounts and activations</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Wallet Balance</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Registered</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>{user.first_name} {user.last_name}</TableCell>
+                      <TableCell>{user.phone}</TableCell>
+                      <TableCell>{user.wallet_balance.toLocaleString()} RWF</TableCell>
+                      <TableCell>
+                        <Badge variant={user.is_active ? 'default' : 'secondary'}>
+                          {user.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant={user.is_active ? 'destructive' : 'default'}
+                          onClick={() => handleUserActivation(user.id, !user.is_active)}
+                        >
+                          {user.is_active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Packages Tab */}
+        {activeTab === 'packages' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>Manage user accounts, activations, and wallet balances</CardDescription>
+                <CardTitle>Create New Package</CardTitle>
+                <CardDescription>Add a new investment package</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="packageName">Package Name</Label>
+                  <Input
+                    id="packageName"
+                    placeholder="e.g., Premium Package"
+                    value={packageForm.name}
+                    onChange={(e) => setPackageForm({...packageForm, name: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Investment Amount (RWF)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    placeholder="e.g., 50000"
+                    value={packageForm.amount}
+                    onChange={(e) => setPackageForm({...packageForm, amount: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="returnAmount">Return Amount (RWF)</Label>
+                  <Input
+                    id="returnAmount"
+                    type="number"
+                    placeholder="e.g., 65000"
+                    value={packageForm.return_amount}
+                    onChange={(e) => setPackageForm({...packageForm, return_amount: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="duration">Duration (Days)</Label>
+                  <Input
+                    id="duration"
+                    type="number"
+                    placeholder="e.g., 30"
+                    value={packageForm.duration_days}
+                    onChange={(e) => setPackageForm({...packageForm, duration_days: e.target.value})}
+                  />
+                </div>
+
+                <Button onClick={handlePackageCreate} className="w-full">
+                  Create Package
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Existing Packages</CardTitle>
+                <CardDescription>Manage investment packages</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {users.map((user) => (
-                    <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-4">
-                          <div>
-                            <h3 className="font-semibold">{user.name}</h3>
-                            <p className="text-sm text-gray-600">{user.email}</p>
-                            <p className="text-sm text-gray-600">{user.phone}</p>
-                          </div>
-                          <Badge variant={user.isActive ? "default" : "destructive"}>
-                            {user.isActive ? "Active" : "Pending"}
-                          </Badge>
-                        </div>
-                        <div className="mt-2 grid grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <span className="text-gray-600">Wallet: </span>
-                            <span className="font-medium">{user.walletBalance.toLocaleString()} RWF</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Invested: </span>
-                            <span className="font-medium">{user.totalInvested.toLocaleString()} RWF</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Joined: </span>
-                            <span className="font-medium">{user.joinDate}</span>
-                          </div>
-                        </div>
+                  {packages.map((pkg) => (
+                    <div key={pkg.id} className="p-4 border rounded-lg">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-semibold">{pkg.name}</h3>
+                        <Badge variant={pkg.is_active ? 'default' : 'secondary'}>
+                          {pkg.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
                       </div>
-                      <div className="flex flex-col space-y-2">
-                        <Button
-                          size="sm"
-                          variant={user.isActive ? "destructive" : "default"}
-                          onClick={() => handleUserActivation(user.id, !user.isActive)}
-                        >
-                          {user.isActive ? "Deactivate" : "Activate"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleWalletAdjustment(user.id, 10000)}
-                        >
-                          +10K
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleWalletAdjustment(user.id, -10000)}
-                        >
-                          -10K
-                        </Button>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <p>Investment: {pkg.amount.toLocaleString()} RWF</p>
+                        <p>Returns: {pkg.return_amount.toLocaleString()} RWF</p>
+                        <p>Duration: {pkg.duration_days} days</p>
+                        <p>Max Purchases: {pkg.max_purchases}</p>
                       </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-2"
+                        onClick={() => handlePackageToggle(pkg.id, pkg.is_active)}
+                      >
+                        {pkg.is_active ? 'Deactivate' : 'Activate'}
+                      </Button>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="packages" className="space-y-6">
-            <div className="grid lg:grid-cols-2 gap-6">
-              {/* Create New Package */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Create New Package</CardTitle>
-                  <CardDescription>Add a new investment package</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="packageName">Package Name</Label>
-                      <Input
-                        id="packageName"
-                        placeholder="e.g., Premium Package"
-                        value={newPackage.name}
-                        onChange={(e) => setNewPackage({...newPackage, name: e.target.value})}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="amount">Investment Amount (RWF)</Label>
-                        <Input
-                          id="amount"
-                          type="number"
-                          placeholder="25000"
-                          value={newPackage.amount}
-                          onChange={(e) => setNewPackage({...newPackage, amount: e.target.value})}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="returnAmount">Return Amount (RWF)</Label>
-                        <Input
-                          id="returnAmount"
-                          type="number"
-                          placeholder="30000"
-                          value={newPackage.returnAmount}
-                          onChange={(e) => setNewPackage({...newPackage, returnAmount: e.target.value})}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="duration">Duration (Days)</Label>
-                        <Input
-                          id="duration"
-                          type="number"
-                          placeholder="30"
-                          value={newPackage.duration}
-                          onChange={(e) => setNewPackage({...newPackage, duration: e.target.value})}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="maxPurchases">Max Purchases</Label>
-                        <Input
-                          id="maxPurchases"
-                          type="number"
-                          placeholder="3"
-                          value={newPackage.maxPurchases}
-                          onChange={(e) => setNewPackage({...newPackage, maxPurchases: e.target.value})}
-                        />
-                      </div>
-                    </div>
-                    <Button onClick={handleCreatePackage} className="w-full">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Package
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Existing Packages */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Existing Packages</CardTitle>
-                  <CardDescription>Manage current investment packages</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {packages.map((pkg) => (
-                      <div key={pkg.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex-1">
-                          <h3 className="font-semibold">{pkg.name}</h3>
-                          <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-gray-600">
-                            <span>Amount: {pkg.amount.toLocaleString()} RWF</span>
-                            <span>Return: {pkg.returnAmount.toLocaleString()} RWF</span>
-                            <span>Duration: {pkg.duration} days</span>
-                            <span>Max: {pkg.maxPurchases} purchases</span>
-                          </div>
-                        </div>
-                        <div className="flex space-x-2">
-                          <Button size="sm" variant="outline">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="destructive"
-                            onClick={() => handleDeletePackage(pkg.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="withdrawals" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Withdrawal Requests</CardTitle>
-                <CardDescription>Approve or reject user withdrawal requests</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+        {/* Withdrawals Tab */}
+        {activeTab === 'withdrawals' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Withdrawal Requests</CardTitle>
+              <CardDescription>Manage user withdrawal requests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Fee</TableHead>
+                    <TableHead>Net Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Requested</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {withdrawals.map((withdrawal) => (
-                    <div key={withdrawal.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex-1">
-                        <h3 className="font-semibold">{withdrawal.userName}</h3>
-                        <div className="grid grid-cols-3 gap-4 mt-2 text-sm">
-                          <div>
-                            <span className="text-gray-600">Amount: </span>
-                            <span className="font-medium">{withdrawal.amount.toLocaleString()} RWF</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Fee: </span>
-                            <span className="font-medium">{withdrawal.fee.toLocaleString()} RWF</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Net: </span>
-                            <span className="font-medium">{withdrawal.netAmount.toLocaleString()} RWF</span>
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Requested: {withdrawal.requestDate}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
+                    <TableRow key={withdrawal.id}>
+                      <TableCell>
+                        {withdrawal.profiles.first_name} {withdrawal.profiles.last_name}
+                      </TableCell>
+                      <TableCell>{withdrawal.amount.toLocaleString()} RWF</TableCell>
+                      <TableCell>{withdrawal.fee.toLocaleString()} RWF</TableCell>
+                      <TableCell>{withdrawal.net_amount.toLocaleString()} RWF</TableCell>
+                      <TableCell>
                         <Badge variant={
-                          withdrawal.status === 'approved' ? 'default' : 
+                          withdrawal.status === 'approved' ? 'default' :
                           withdrawal.status === 'rejected' ? 'destructive' : 'secondary'
                         }>
                           {withdrawal.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell>{new Date(withdrawal.requested_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
                         {withdrawal.status === 'pending' && (
                           <div className="flex space-x-2">
                             <Button
                               size="sm"
-                              onClick={() => handleWithdrawalAction(withdrawal.id, true)}
+                              onClick={() => handleWithdrawalAction(withdrawal.id, 'approve')}
                             >
                               <Check className="h-4 w-4" />
                             </Button>
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => handleWithdrawalAction(withdrawal.id, false)}
+                              onClick={() => handleWithdrawalAction(withdrawal.id, 'reject')}
                             >
                               <X className="h-4 w-4" />
                             </Button>
                           </div>
                         )}
-                      </div>
-                    </div>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                  {withdrawals.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      No withdrawal requests at this time.
-                    </div>
-                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Wallet Adjustment Tab */}
+        {activeTab === 'wallet' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Wallet Management</CardTitle>
+              <CardDescription>Manually adjust user wallet balances</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="userSelect">Select User</Label>
+                  <select
+                    id="userSelect"
+                    className="w-full p-2 border rounded"
+                    value={walletAdjustment.userId}
+                    onChange={(e) => setWalletAdjustment({...walletAdjustment, userId: e.target.value})}
+                  >
+                    <option value="">Select a user</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.first_name} {user.last_name} ({user.wallet_balance.toLocaleString()} RWF)
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="system" className="space-y-6">
-            <div className="grid lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>System Statistics</CardTitle>
-                  <CardDescription>Overview of platform performance</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-4 bg-blue-50 rounded-lg">
-                        <p className="text-2xl font-bold text-blue-600">{stats.totalUsers}</p>
-                        <p className="text-sm text-gray-600">Total Users</p>
-                      </div>
-                      <div className="text-center p-4 bg-green-50 rounded-lg">
-                        <p className="text-2xl font-bold text-green-600">{stats.activeUsers}</p>
-                        <p className="text-sm text-gray-600">Active Users</p>
-                      </div>
-                      <div className="text-center p-4 bg-purple-50 rounded-lg">
-                        <p className="text-2xl font-bold text-purple-600">
-                          {(stats.totalInvestments / 1000000).toFixed(1)}M
-                        </p>
-                        <p className="text-sm text-gray-600">Total Invested (RWF)</p>
-                      </div>
-                      <div className="text-center p-4 bg-orange-50 rounded-lg">
-                        <p className="text-2xl font-bold text-orange-600">
-                          {(stats.pendingWithdrawals / 1000).toFixed(0)}K
-                        </p>
-                        <p className="text-sm text-gray-600">Pending Withdrawals</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription>Common administrative tasks</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <Button className="w-full" variant="outline">
-                      Export User Data
-                    </Button>
-                    <Button className="w-full" variant="outline">
-                      Generate Reports
-                    </Button>
-                    <Button className="w-full" variant="outline">
-                      System Backup
-                    </Button>
-                    <Button className="w-full" variant="outline">
-                      Send Notifications
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="adjustmentType">Type</Label>
+                  <select
+                    id="adjustmentType"
+                    className="w-full p-2 border rounded"
+                    value={walletAdjustment.type}
+                    onChange={(e) => setWalletAdjustment({...walletAdjustment, type: e.target.value as 'add' | 'subtract'})}
+                  >
+                    <option value="add">Add Funds</option>
+                    <option value="subtract">Subtract Funds</option>
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="adjustmentAmount">Amount (RWF)</Label>
+                  <Input
+                    id="adjustmentAmount"
+                    type="number"
+                    placeholder="Enter amount"
+                    value={walletAdjustment.amount}
+                    onChange={(e) => setWalletAdjustment({...walletAdjustment, amount: e.target.value})}
+                  />
+                </div>
+                
+                <div className="flex items-end">
+                  <Button onClick={handleWalletAdjustment} className="w-full">
+                    Adjust Wallet
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
