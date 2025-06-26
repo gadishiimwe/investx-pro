@@ -16,34 +16,46 @@ const Login = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, user } = useAuth();
+  const { signIn, user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      if (isAdmin) {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     }
-  }, [user, navigate]);
+  }, [user, isAdmin, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
+      console.log('User login attempt for:', formData.email);
       const { error } = await signIn(formData.email, formData.password);
       
       if (error) {
+        console.error('Login failed:', error);
         toast({
           title: "Login Failed",
           description: error.message || "Invalid email or password.",
           variant: "destructive",
         });
+      } else {
+        toast({
+          title: "Login Successful",
+          description: "Welcome back!",
+        });
       }
     } catch (error) {
+      console.error('Login exception:', error);
       toast({
         title: "Login Failed",
-        description: "Please try again later.",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -76,7 +88,7 @@ const Login = () => {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="john@example.com"
+                  placeholder="your.email@example.com"
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                   required

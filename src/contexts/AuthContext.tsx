@@ -24,7 +24,6 @@ interface AuthContextType {
   isAdmin: boolean;
   signUp: (email: string, password: string, firstName: string, lastName: string, phone: string, referralCode?: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  adminSignIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -39,18 +38,6 @@ export const useAuth = () => {
   return context;
 };
 
-// Clean up auth state utility
-const cleanupAuthState = () => {
-  localStorage.removeItem('supabase.auth.token');
-  localStorage.removeItem('userType');
-  localStorage.removeItem('isAuthenticated');
-  Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-      localStorage.removeItem(key);
-    }
-  });
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -60,24 +47,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string) => {
     try {
+      console.log('Fetching profile for user:', userId);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching profile:', error);
+        setProfile(null);
+        return;
+      }
+      
+      console.log('Profile fetched successfully:', data);
       setProfile(data);
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Profile fetch exception:', error);
       setProfile(null);
     }
   };
 
   const checkAdminStatus = (userEmail: string) => {
-    // Check if user is admin based on email
     const adminEmails = ['admin@investx.rw'];
-    return adminEmails.includes(userEmail);
+    return adminEmails.includes(userEmail.toLowerCase());
   };
 
   const refreshProfile = async () => {
@@ -87,7 +80,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Set up auth state listener
+    console.log('Setting up auth state listener...');
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
@@ -99,25 +93,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const adminStatus = checkAdminStatus(session.user.email || '');
           setIsAdmin(adminStatus);
           
-          if (adminStatus) {
-            localStorage.setItem('userType', 'admin');
-            localStorage.setItem('isAuthenticated', 'true');
-          } else {
-            localStorage.removeItem('userType');
-            localStorage.removeItem('isAuthenticated');
-          }
-          
-          // Defer profile fetching for non-admin users
           if (!adminStatus) {
+            // Only fetch profile for non-admin users
             setTimeout(() => {
               fetchProfile(session.user.id);
-            }, 0);
+            }, 100);
           }
         } else {
           setProfile(null);
           setIsAdmin(false);
-          localStorage.removeItem('userType');
-          localStorage.removeItem('isAuthenticated');
         }
         
         setLoading(false);
@@ -126,6 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -133,10 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const adminStatus = checkAdminStatus(session.user.email || '');
         setIsAdmin(adminStatus);
         
-        if (adminStatus) {
-          localStorage.setItem('userType', 'admin');
-          localStorage.setItem('isAuthenticated', 'true');
-        } else if (!adminStatus) {
+        if (!adminStatus) {
           fetchProfile(session.user.id);
         }
       }
@@ -149,12 +131,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string, phone: string, referralCode?: string) => {
     try {
-      cleanupAuthState();
+      console.log('Starting signup process for:', email);
       
       const redirectUrl = `${window.location.origin}/`;
       
-      const { error } = await supabase.auth.signUp({
-        email,
+      const { data, error } = await supabase.auth.signUp({
+        email: email.toLowerCase(),
         password,
         options: {
           emailRedirectTo: redirectUrl,
@@ -167,83 +149,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      return { error };
+      if (error) {
+        console.error('Signup error:', error);
+        return { error };
+      }
+
+      console.log('Signup successful:', data);
+      return { error: null };
     } catch (error) {
-      console.error('Sign up error:', error);
+      console.error('Signup exception:', error);
       return { error };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      cleanupAuthState();
+      console.log('Starting signin process for:', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.toLowerCase(),
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Signin error:', error);
+        return { error };
+      }
+
+      console.log('Signin successful:', data);
       
+      // Check if admin and redirect appropriately
       if (data.user) {
-        // Check if admin
         const adminStatus = checkAdminStatus(data.user.email || '');
         if (adminStatus) {
-          window.location.href = '/admin/dashboard';
+          setTimeout(() => {
+            window.location.href = '/admin/dashboard';
+          }, 100);
         } else {
-          window.location.href = '/dashboard';
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 100);
         }
       }
 
       return { error: null };
     } catch (error) {
-      console.error('Sign in error:', error);
-      return { error };
-    }
-  };
-
-  const adminSignIn = async (email: string, password: string) => {
-    try {
-      cleanupAuthState();
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-      
-      if (data.user) {
-        const adminStatus = checkAdminStatus(data.user.email || '');
-        if (adminStatus) {
-          setIsAdmin(true);
-          localStorage.setItem('userType', 'admin');
-          localStorage.setItem('isAuthenticated', 'true');
-          return { error: null };
-        } else {
-          await supabase.auth.signOut();
-          return { error: { message: 'Access denied. Admin credentials required.' } };
-        }
-      }
-
-      return { error: null };
-    } catch (error) {
-      console.error('Admin sign in error:', error);
+      console.error('Signin exception:', error);
       return { error };
     }
   };
 
   const signOut = async () => {
     try {
-      cleanupAuthState();
-      await supabase.auth.signOut({ scope: 'global' });
+      console.log('Starting signout process...');
+      await supabase.auth.signOut();
       setUser(null);
       setSession(null);
       setProfile(null);
       setIsAdmin(false);
       window.location.href = '/';
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('Signout error:', error);
     }
   };
 
@@ -256,7 +222,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAdmin,
       signUp,
       signIn,
-      adminSignIn,
       signOut,
       refreshProfile
     }}>

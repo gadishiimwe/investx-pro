@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,21 +55,21 @@ const Register = () => {
     setIsLoading(true);
     
     try {
-      console.log('Starting registration process...');
+      console.log('Registration attempt for:', formData.email);
       const { error } = await signUp(
         formData.email,
         formData.password,
         formData.firstName,
         formData.lastName,
         formData.phone,
-        formData.referralCode
+        formData.referralCode || undefined
       );
       
       if (error) {
-        console.error('Registration error:', error);
+        console.error('Registration failed:', error);
         toast({
           title: "Registration Failed",
-          description: error.message || "Please try again.",
+          description: error.message || "Please try again with different credentials.",
           variant: "destructive",
         });
       } else {
@@ -78,14 +77,12 @@ const Register = () => {
           title: "Registration Successful!",
           description: "Please check your email to verify your account, then complete the payment process.",
         });
-        // Don't navigate immediately, let the user verify their email first
-        // navigate('/login');
       }
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('Registration exception:', error);
       toast({
         title: "Registration Failed",
-        description: "Please try again later.",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
