@@ -12,7 +12,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, isAdmin } = useAuth();
   const { toast } = useToast();
 
   const copyToClipboard = (text: string) => {
@@ -36,6 +36,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Admin users bypass activation requirement
+  if (isAdmin) {
+    return <>{children}</>;
   }
 
   if (!profile?.is_active) {
