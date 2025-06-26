@@ -84,7 +84,7 @@ const AdminLogin = () => {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@investx.rw"
+                  placeholder="admin@investx.com"
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                   required
@@ -127,7 +127,7 @@ const AdminLogin = () => {
 
             <div className="mt-6 p-4 bg-red-50 rounded-lg border border-red-200">
               <p className="text-sm font-medium text-red-700 mb-2">Setup Instructions:</p>
-              <p className="text-xs text-red-600">1. Register admin@investx.rw through normal signup</p>
+              <p className="text-xs text-red-600">1. Register admin@investx.com through normal signup</p>
               <p className="text-xs text-red-600">2. Use those same credentials here for admin access</p>
             </div>
           </CardContent>
