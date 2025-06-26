@@ -21,8 +21,10 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  isAdmin: boolean;
   signUp: (email: string, password: string, firstName: string, lastName: string, phone: string, referralCode?: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
+  adminSignIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -37,11 +39,24 @@ export const useAuth = () => {
   return context;
 };
 
+// Clean up auth state utility
+const cleanupAuthState = () => {
+  localStorage.removeItem('supabase.auth.token');
+  localStorage.removeItem('userType');
+  localStorage.removeItem('isAuthenticated');
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      localStorage.removeItem(key);
+    }
+  });
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -59,6 +74,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const checkAdminStatus = (userEmail: string) => {
+    // Check if user is admin based on email
+    const adminEmails = ['admin@investx.rw'];
+    return adminEmails.includes(userEmail);
+  };
+
   const refreshProfile = async () => {
     if (user) {
       await fetchProfile(user.id);
@@ -69,15 +90,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
+        
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-          }, 0);
+          const adminStatus = checkAdminStatus(session.user.email || '');
+          setIsAdmin(adminStatus);
+          
+          if (adminStatus) {
+            localStorage.setItem('userType', 'admin');
+            localStorage.setItem('isAuthenticated', 'true');
+          } else {
+            localStorage.removeItem('userType');
+            localStorage.removeItem('isAuthenticated');
+          }
+          
+          // Defer profile fetching for non-admin users
+          if (!adminStatus) {
+            setTimeout(() => {
+              fetchProfile(session.user.id);
+            }, 0);
+          }
         } else {
           setProfile(null);
+          setIsAdmin(false);
+          localStorage.removeItem('userType');
+          localStorage.removeItem('isAuthenticated');
         }
         
         setLoading(false);
@@ -90,7 +130,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchProfile(session.user.id);
+        const adminStatus = checkAdminStatus(session.user.email || '');
+        setIsAdmin(adminStatus);
+        
+        if (adminStatus) {
+          localStorage.setItem('userType', 'admin');
+          localStorage.setItem('isAuthenticated', 'true');
+        } else if (!adminStatus) {
+          fetchProfile(session.user.id);
+        }
       }
       
       setLoading(false);
@@ -101,8 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string, phone: string, referralCode?: string) => {
     try {
-      // Clean up any existing auth state
-      await supabase.auth.signOut({ scope: 'global' });
+      cleanupAuthState();
       
       const redirectUrl = `${window.location.origin}/`;
       
@@ -122,14 +169,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { error };
     } catch (error) {
+      console.error('Sign up error:', error);
       return { error };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      // Clean up any existing auth state
-      await supabase.auth.signOut({ scope: 'global' });
+      cleanupAuthState();
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -139,21 +186,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       
       if (data.user) {
-        window.location.href = '/dashboard';
+        // Check if admin
+        const adminStatus = checkAdminStatus(data.user.email || '');
+        if (adminStatus) {
+          window.location.href = '/admin/dashboard';
+        } else {
+          window.location.href = '/dashboard';
+        }
       }
 
       return { error: null };
     } catch (error) {
+      console.error('Sign in error:', error);
+      return { error };
+    }
+  };
+
+  const adminSignIn = async (email: string, password: string) => {
+    try {
+      cleanupAuthState();
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      
+      if (data.user) {
+        const adminStatus = checkAdminStatus(data.user.email || '');
+        if (adminStatus) {
+          setIsAdmin(true);
+          localStorage.setItem('userType', 'admin');
+          localStorage.setItem('isAuthenticated', 'true');
+          return { error: null };
+        } else {
+          await supabase.auth.signOut();
+          return { error: { message: 'Access denied. Admin credentials required.' } };
+        }
+      }
+
+      return { error: null };
+    } catch (error) {
+      console.error('Admin sign in error:', error);
       return { error };
     }
   };
 
   const signOut = async () => {
     try {
+      cleanupAuthState();
       await supabase.auth.signOut({ scope: 'global' });
       setUser(null);
       setSession(null);
       setProfile(null);
+      setIsAdmin(false);
       window.location.href = '/';
     } catch (error) {
       console.error('Error signing out:', error);
@@ -166,8 +253,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       session,
       profile,
       loading,
+      isAdmin,
       signUp,
       signIn,
+      adminSignIn,
       signOut,
       refreshProfile
     }}>

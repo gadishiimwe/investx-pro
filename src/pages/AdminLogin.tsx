@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TrendingUp, Eye, EyeOff, Shield } from 'lucide-react';
+import { Eye, EyeOff, Shield } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from "@/hooks/use-toast";
 
 const AdminLogin = () => {
@@ -15,6 +16,7 @@ const AdminLogin = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { adminSignIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -23,24 +25,20 @@ const AdminLogin = () => {
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await adminSignIn(formData.email, formData.password);
       
-      // Check admin credentials
-      if (formData.email === 'admin@investx.rw' && formData.password === 'admin123') {
-        localStorage.setItem('userType', 'admin');
-        localStorage.setItem('isAuthenticated', 'true');
+      if (error) {
+        toast({
+          title: "Access Denied",
+          description: error.message || "Invalid admin credentials.",
+          variant: "destructive",
+        });
+      } else {
         toast({
           title: "Admin Access Granted",
           description: "Welcome to the admin dashboard.",
         });
         navigate('/admin/dashboard');
-      } else {
-        toast({
-          title: "Access Denied",
-          description: "Invalid admin credentials.",
-          variant: "destructive",
-        });
       }
     } catch (error) {
       toast({
@@ -127,6 +125,7 @@ const AdminLogin = () => {
               <p className="text-sm font-medium text-red-700 mb-2">Demo Admin Credentials:</p>
               <p className="text-xs text-red-600">Email: admin@investx.rw</p>
               <p className="text-xs text-red-600">Password: admin123</p>
+              <p className="text-xs text-red-600 mt-2">Note: You need to register this email first with Supabase auth</p>
             </div>
           </CardContent>
         </Card>

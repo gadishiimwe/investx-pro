@@ -1,25 +1,16 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Navigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AdminProtectedRouteProps {
   children: React.ReactNode;
 }
 
 const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const { user, loading, isAdmin } = useAuth();
 
-  useEffect(() => {
-    const checkAuth = () => {
-      const userType = localStorage.getItem('userType');
-      const isAuth = localStorage.getItem('isAuthenticated');
-      setIsAuthenticated(userType === 'admin' && isAuth === 'true');
-    };
-
-    checkAuth();
-  }, []);
-
-  if (isAuthenticated === null) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center">
         <div className="text-center">
@@ -30,7 +21,7 @@ const AdminProtectedRoute: React.FC<AdminProtectedRouteProps> = ({ children }) =
     );
   }
 
-  if (!isAuthenticated) {
+  if (!user || !isAdmin) {
     return <Navigate to="/admin/login" replace />;
   }
 

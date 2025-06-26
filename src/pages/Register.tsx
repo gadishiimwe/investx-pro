@@ -56,6 +56,7 @@ const Register = () => {
     setIsLoading(true);
     
     try {
+      console.log('Starting registration process...');
       const { error } = await signUp(
         formData.email,
         formData.password,
@@ -66,6 +67,7 @@ const Register = () => {
       );
       
       if (error) {
+        console.error('Registration error:', error);
         toast({
           title: "Registration Failed",
           description: error.message || "Please try again.",
@@ -76,9 +78,11 @@ const Register = () => {
           title: "Registration Successful!",
           description: "Please check your email to verify your account, then complete the payment process.",
         });
-        navigate('/login');
+        // Don't navigate immediately, let the user verify their email first
+        // navigate('/login');
       }
     } catch (error) {
+      console.error('Registration error:', error);
       toast({
         title: "Registration Failed",
         description: "Please try again later.",

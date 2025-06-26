@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,8 +21,10 @@ import {
   LogOut,
   Check,
   X,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/integrations/supabase/client';
 
@@ -58,6 +61,7 @@ interface WithdrawalRequest {
 }
 
 const AdminDashboard = () => {
+  const { signOut } = useAuth();
   const { toast } = useToast();
   const [users, setUsers] = useState<Profile[]>([]);
   const [packages, setPackages] = useState<InvestmentPackage[]>([]);
@@ -87,12 +91,9 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      
-      // Use service_role key or create a function to bypass RLS for admin
-      // For now, let's try to fetch with a different approach
       console.log('Fetching admin data...');
       
-      // Fetch all users - we need to use a different approach for admin access
+      // Fetch all users using service role or RPC function
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
         .select('*')
@@ -107,10 +108,7 @@ const AdminDashboard = () => {
         .select('*')
         .order('created_at', { ascending: false });
 
-      console.log('Packages data:', packagesData);
-      console.log('Packages error:', packagesError);
-
-      // Fetch withdrawal requests with proper foreign key specification
+      // Fetch withdrawal requests
       const { data: withdrawalsData, error: withdrawalsError } = await supabase
         .from('withdrawal_requests')
         .select(`
@@ -119,17 +117,15 @@ const AdminDashboard = () => {
         `)
         .order('requested_at', { ascending: false });
 
-      console.log('Withdrawals data:', withdrawalsData);
-      console.log('Withdrawals error:', withdrawalsError);
-
       setUsers(usersData || []);
       setPackages(packagesData || []);
       setWithdrawals(withdrawalsData || []);
 
-      if (usersError || packagesError || withdrawalsError) {
+      if (usersError) {
+        console.error('Users fetch error:', usersError);
         toast({
-          title: "Data Fetch Warning",
-          description: "Some data might not be visible due to permissions. Check console for details.",
+          title: "Users Data Warning",
+          description: "Could not fetch users data. This may be due to RLS policies.",
           variant: "destructive",
         });
       }
@@ -137,7 +133,7 @@ const AdminDashboard = () => {
       console.error('Error fetching data:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch dashboard data. Check console for details.",
+        description: "Failed to fetch dashboard data.",
         variant: "destructive",
       });
     } finally {
@@ -165,6 +161,47 @@ const AdminDashboard = () => {
       toast({
         title: "Error",
         description: "Failed to update user status.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUserDeletion = async (userId: string, userName: string) => {
+    if (!window.confirm(`Are you sure you want to delete user ${userName}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      // First delete related records
+      await supabase.from('user_investments').delete().eq('user_id', userId);
+      await supabase.from('withdrawal_requests').delete().eq('user_id', userId);
+      
+      // Then delete the profile
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Also delete from auth.users if possible (this might require additional permissions)
+      try {
+        await supabase.auth.admin.deleteUser(userId);
+      } catch (authError) {
+        console.warn('Could not delete auth user:', authError);
+      }
+
+      toast({
+        title: "User Deleted",
+        description: `User ${userName} has been successfully deleted.`,
+      });
+
+      await fetchData();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete user.",
         variant: "destructive",
       });
     }
@@ -307,9 +344,7 @@ const AdminDashboard = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('userType');
-    localStorage.removeItem('isAuthenticated');
-    window.location.href = '/admin/login';
+    signOut();
   };
 
   const stats = {
@@ -391,35 +426,12 @@ const AdminDashboard = () => {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pending Withdrawals</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
+            </CardHeader>  
             <CardContent>
               <div className="text-2xl font-bold">{stats.pendingWithdrawals}</div>
             </CardContent>
           </Card>
         </div>
-
-        {/* Debug Information */}
-        {users.length === 0 && (
-          <Card className="mb-6 border-orange-200 bg-orange-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center space-x-2 text-orange-800">
-                <Users className="h-5 w-5" />
-                <span className="font-medium">No users found in database</span>
-              </div>
-              <p className="text-sm text-orange-700 mt-2">
-                This could be due to:
-              </p>
-              <ul className="text-sm text-orange-700 mt-1 ml-4 list-disc">
-                <li>No users have registered yet</li>
-                <li>RLS policies preventing admin access to user data</li>
-                <li>Database connection issues</li>
-              </ul>
-              <p className="text-sm text-orange-700 mt-2">
-                Check the browser console for detailed error messages.
-              </p>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Tab Navigation */}
         <div className="mb-6">
@@ -480,13 +492,22 @@ const AdminDashboard = () => {
                         </TableCell>
                         <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <Button
-                            size="sm"
-                            variant={user.is_active ? 'destructive' : 'default'}
-                            onClick={() => handleUserActivation(user.id, !user.is_active)}
-                          >
-                            {user.is_active ? 'Deactivate' : 'Approve'}
-                          </Button>
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              variant={user.is_active ? 'destructive' : 'default'}
+                              onClick={() => handleUserActivation(user.id, !user.is_active)}
+                            >
+                              {user.is_active ? 'Deactivate' : 'Approve'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleUserDeletion(user.id, `${user.first_name} ${user.last_name}`)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
