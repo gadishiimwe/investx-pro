@@ -69,8 +69,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const checkAdminStatus = (userEmail: string) => {
-    // Updated to use a standard email domain that Supabase will accept
-    const adminEmails = ['admin@investx.com', 'admin@example.com'];
+    // Updated to use the confirmed Gmail account for admin access
+    const adminEmails = ['gadyishimwe1@gmail.com'];
     return adminEmails.includes(userEmail.toLowerCase());
   };
 
