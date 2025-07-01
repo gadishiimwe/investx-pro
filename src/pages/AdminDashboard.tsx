@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { 
   Table, 
   TableBody, 
@@ -47,6 +47,8 @@ interface InvestmentPackage {
   duration_days: number;
   max_purchases: number;
   is_active: boolean;
+  package_type: 'daily' | 'stable';
+  daily_income?: number;
 }
 
 interface WithdrawalRequest {
@@ -75,6 +77,7 @@ const AdminDashboard = () => {
     amount: '',
     return_amount: '',
     duration_days: '',
+    package_type: 'stable' as 'daily' | 'stable'
   });
 
   // Wallet adjustment form
@@ -118,7 +121,11 @@ const AdminDashboard = () => {
         .order('requested_at', { ascending: false });
 
       setUsers(usersData || []);
-      setPackages(packagesData || []);
+      setPackages((packagesData as any[])?.map(pkg => ({
+        ...pkg,
+        package_type: pkg.package_type as 'daily' | 'stable',
+        daily_income: pkg.daily_income || 0
+      })) || []);
       setWithdrawals(withdrawalsData || []);
 
       if (usersError) {
@@ -296,17 +303,18 @@ const AdminDashboard = () => {
           amount: parseFloat(packageForm.amount),
           return_amount: parseFloat(packageForm.return_amount),
           duration_days: parseInt(packageForm.duration_days),
-          max_purchases: 3
+          max_purchases: 3,
+          package_type: packageForm.package_type
         });
 
       if (error) throw error;
 
       toast({
         title: "Package Created",
-        description: "New investment package has been created successfully.",
+        description: `New ${packageForm.package_type} investment package has been created successfully.`,
       });
 
-      setPackageForm({ name: '', amount: '', return_amount: '', duration_days: '' });
+      setPackageForm({ name: '', amount: '', return_amount: '', duration_days: '', package_type: 'stable' });
       await fetchData();
     } catch (error) {
       console.error('Error creating package:', error);
@@ -576,6 +584,34 @@ const AdminDashboard = () => {
                   />
                 </div>
 
+                <div className="space-y-3">
+                  <Label>Package Type</Label>
+                  <RadioGroup 
+                    value={packageForm.package_type} 
+                    onValueChange={(value) => setPackageForm({...packageForm, package_type: value as 'daily' | 'stable'})}
+                    className="flex flex-col space-y-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="stable" id="stable" />
+                      <Label htmlFor="stable" className="cursor-pointer">
+                        <div>
+                          <span className="font-medium">Stable Package</span>
+                          <p className="text-sm text-gray-500">Full return paid only at maturity</p>
+                        </div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="daily" id="daily" />
+                      <Label htmlFor="daily" className="cursor-pointer">
+                        <div>
+                          <span className="font-medium">Daily Package</span>
+                          <p className="text-sm text-gray-500">Daily income + capital return at maturity</p>
+                        </div>
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
                 <Button onClick={handlePackageCreate} className="w-full">
                   Create Package
                 </Button>
@@ -592,7 +628,12 @@ const AdminDashboard = () => {
                   {packages.map((pkg) => (
                     <div key={pkg.id} className="p-4 border rounded-lg">
                       <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold">{pkg.name}</h3>
+                        <div>
+                          <h3 className="font-semibold">{pkg.name}</h3>
+                          <Badge variant="outline" className="mt-1">
+                            {pkg.package_type === 'daily' ? 'Daily Income' : 'Stable Return'}
+                          </Badge>
+                        </div>
                         <Badge variant={pkg.is_active ? 'default' : 'secondary'}>
                           {pkg.is_active ? 'Active' : 'Inactive'}
                         </Badge>
@@ -601,6 +642,9 @@ const AdminDashboard = () => {
                         <p>Investment: {pkg.amount.toLocaleString()} RWF</p>
                         <p>Returns: {pkg.return_amount.toLocaleString()} RWF</p>
                         <p>Duration: {pkg.duration_days} days</p>
+                        {pkg.package_type === 'daily' && pkg.daily_income && (
+                          <p>Daily Income: {pkg.daily_income.toLocaleString()} RWF/day</p>
+                        )}
                         <p>Max Purchases: {pkg.max_purchases}</p>
                       </div>
                       <Button
