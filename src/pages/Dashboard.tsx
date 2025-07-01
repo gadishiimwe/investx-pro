@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,8 +91,22 @@ const Dashboard = () => {
         .eq('user_id', profile?.id)
         .order('requested_at', { ascending: false });
 
-      setPackages(packagesData || []);
-      setInvestments(investmentsData || []);
+      // Type assertion to ensure proper typing
+      setPackages((packagesData as any[])?.map(pkg => ({
+        ...pkg,
+        package_type: pkg.package_type as 'daily' | 'stable',
+        daily_income: pkg.daily_income || 0
+      })) || []);
+      
+      setInvestments((investmentsData as any[])?.map(inv => ({
+        ...inv,
+        investment_packages: {
+          ...inv.investment_packages,
+          package_type: inv.investment_packages.package_type as 'daily' | 'stable',
+          daily_income: inv.investment_packages.daily_income || 0
+        }
+      })) || []);
+      
       setWithdrawals(withdrawalsData || []);
     } catch (error) {
       console.error('Error fetching data:', error);
