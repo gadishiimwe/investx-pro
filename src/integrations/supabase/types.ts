@@ -33,35 +33,76 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_payouts: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          investment_id: string
+          payout_date: string
+          payout_type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          investment_id: string
+          payout_date?: string
+          payout_type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          investment_id?: string
+          payout_date?: string
+          payout_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_payouts_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "user_investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       investment_packages: {
         Row: {
           amount: number
           created_at: string
+          daily_income: number | null
           duration_days: number
           id: string
           is_active: boolean
           max_purchases: number
           name: string
+          package_type: string
           return_amount: number
         }
         Insert: {
           amount: number
           created_at?: string
+          daily_income?: number | null
           duration_days: number
           id?: string
           is_active?: boolean
           max_purchases?: number
           name: string
+          package_type?: string
           return_amount: number
         }
         Update: {
           amount?: number
           created_at?: string
+          daily_income?: number | null
           duration_days?: number
           id?: string
           is_active?: boolean
           max_purchases?: number
           name?: string
+          package_type?: string
           return_amount?: number
         }
         Relationships: []
@@ -118,33 +159,42 @@ export type Database = {
           amount: number
           created_at: string
           id: string
+          is_completed: boolean | null
+          last_payout_date: string | null
           maturity_date: string
           package_id: string
           return_amount: number
           start_date: string
           status: string
+          total_paid_out: number | null
           user_id: string
         }
         Insert: {
           amount: number
           created_at?: string
           id?: string
+          is_completed?: boolean | null
+          last_payout_date?: string | null
           maturity_date: string
           package_id: string
           return_amount: number
           start_date?: string
           status?: string
+          total_paid_out?: number | null
           user_id: string
         }
         Update: {
           amount?: number
           created_at?: string
           id?: string
+          is_completed?: boolean | null
+          last_payout_date?: string | null
           maturity_date?: string
           package_id?: string
           return_amount?: number
           start_date?: string
           status?: string
+          total_paid_out?: number | null
           user_id?: string
         }
         Relationships: [
@@ -223,6 +273,10 @@ export type Database = {
       is_current_user_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      process_daily_payouts: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
     }
     Enums: {

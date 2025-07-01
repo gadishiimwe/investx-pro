@@ -28,6 +28,8 @@ interface InvestmentPackage {
   return_amount: number;
   duration_days: number;
   max_purchases: number;
+  package_type: 'daily' | 'stable';
+  daily_income: number;
 }
 
 interface UserInvestment {
@@ -38,6 +40,9 @@ interface UserInvestment {
   start_date: string;
   maturity_date: string;
   status: string;
+  is_completed: boolean;
+  total_paid_out: number;
+  last_payout_date: string;
   investment_packages: InvestmentPackage;
 }
 
@@ -266,6 +271,14 @@ const Dashboard = () => {
     return Math.max(diffDays, 0);
   };
 
+  const getTotalDaysFromDuration = (startDate: string, durationDays: number) => {
+    return durationDays;
+  };
+
+  const getPackageTypeColor = (packageType: string) => {
+    return packageType === 'daily' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -319,7 +332,7 @@ const Dashboard = () => {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{investments.length}</div>
+              <div className="text-2xl font-bold">{investments.filter(inv => !inv.is_completed).length}</div>
             </CardContent>
           </Card>
 
@@ -345,20 +358,36 @@ const Dashboard = () => {
               {packages.map((pkg) => {
                 const userInvestments = investments.filter(inv => inv.package_id === pkg.id);
                 const canInvest = userInvestments.length < pkg.max_purchases;
+                const dailyIncome = pkg.package_type === 'daily' ? pkg.daily_income : 0;
                 
                 return (
                   <div key={pkg.id} className="p-4 border rounded-lg">
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="font-semibold">{pkg.name}</h3>
-                      <Badge variant={canInvest ? "default" : "secondary"}>
-                        {userInvestments.length}/{pkg.max_purchases}
-                      </Badge>
+                      <div className="flex gap-2">
+                        <Badge variant={canInvest ? "default" : "secondary"}>
+                          {userInvestments.length}/{pkg.max_purchases}
+                        </Badge>
+                        <Badge className={getPackageTypeColor(pkg.package_type)}>
+                          {pkg.package_type.charAt(0).toUpperCase() + pkg.package_type.slice(1)}
+                        </Badge>
+                      </div>
                     </div>
                     <div className="space-y-2 text-sm text-gray-600">
                       <p>Investment: {pkg.amount.toLocaleString()} RWF</p>
                       <p>Returns: {pkg.return_amount.toLocaleString()} RWF</p>
                       <p>Duration: {pkg.duration_days} days</p>
                       <p>Profit: {(pkg.return_amount - pkg.amount).toLocaleString()} RWF</p>
+                      {pkg.package_type === 'daily' && (
+                        <p className="text-green-600 font-medium">
+                          Daily Income: {dailyIncome.toLocaleString()} RWF/day
+                        </p>
+                      )}
+                      {pkg.package_type === 'stable' && (
+                        <p className="text-blue-600 font-medium">
+                          Full payout at maturity
+                        </p>
+                      )}
                     </div>
                     <Button 
                       className="w-full mt-3" 
@@ -387,16 +416,27 @@ const Dashboard = () => {
                   {investments.map((investment) => {
                     const progress = getInvestmentProgress(investment.start_date, investment.maturity_date);
                     const daysRemaining = getDaysRemaining(investment.maturity_date);
+                    const totalDays = investment.investment_packages.duration_days;
+                    const dailyIncome = investment.investment_packages.package_type === 'daily' 
+                      ? investment.investment_packages.daily_income 
+                      : 0;
                     
                     return (
                       <div key={investment.id} className="p-4 border rounded-lg">
                         <div className="flex justify-between items-start mb-2">
                           <h3 className="font-semibold">{investment.investment_packages.name}</h3>
-                          <Badge>Active</Badge>
+                          <div className="flex gap-2">
+                            <Badge variant={investment.is_completed ? "secondary" : "default"}>
+                              {investment.is_completed ? 'Completed' : 'Active'}
+                            </Badge>
+                            <Badge className={getPackageTypeColor(investment.investment_packages.package_type)}>
+                              {investment.investment_packages.package_type}
+                            </Badge>
+                          </div>
                         </div>
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span>Progress</span>
+                            <span>Progress ({totalDays - daysRemaining}/{totalDays} days)</span>
                             <span>{Math.round(progress)}%</span>
                           </div>
                           <Progress value={progress} className="h-2" />
@@ -405,9 +445,22 @@ const Dashboard = () => {
                             <span>Returns: {investment.return_amount.toLocaleString()} RWF</span>
                           </div>
                           <div className="flex justify-between text-sm text-gray-600">
-                            <span>{daysRemaining} days remaining</span>
+                            <span className="flex items-center">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {daysRemaining} days remaining
+                            </span>
                             <span>Profit: {(investment.return_amount - investment.amount).toLocaleString()} RWF</span>
                           </div>
+                          {investment.investment_packages.package_type === 'daily' && (
+                            <div className="text-sm text-green-600 font-medium">
+                              Daily Income: {dailyIncome.toLocaleString()} RWF/day
+                              {investment.total_paid_out > 0 && (
+                                <span className="ml-2 text-gray-500">
+                                  (Paid: {investment.total_paid_out.toLocaleString()} RWF)
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
