@@ -351,6 +351,35 @@ const AdminDashboard = () => {
     }
   };
 
+  const handlePackageDelete = async (packageId: string, packageName: string) => {
+    if (!window.confirm(`Are you sure you want to delete the package "${packageName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('investment_packages')
+        .delete()
+        .eq('id', packageId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Package Deleted",
+        description: `Package "${packageName}" has been successfully deleted.`,
+      });
+
+      await fetchData();
+    } catch (error) {
+      console.error('Error deleting package:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete investment package.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleLogout = () => {
     signOut();
   };
@@ -647,14 +676,22 @@ const AdminDashboard = () => {
                         )}
                         <p>Max Purchases: {pkg.max_purchases}</p>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mt-2"
-                        onClick={() => handlePackageToggle(pkg.id, pkg.is_active)}
-                      >
-                        {pkg.is_active ? 'Deactivate' : 'Activate'}
-                      </Button>
+                      <div className="flex space-x-2 mt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handlePackageToggle(pkg.id, pkg.is_active)}
+                        >
+                          {pkg.is_active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handlePackageDelete(pkg.id, pkg.name)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
