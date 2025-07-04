@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +17,9 @@ import InvestmentPackages from "./pages/InvestmentPackages";
 import FAQ from "./pages/FAQ";
 import NotFound from "./pages/NotFound";
 
+// Import Vercel Analytics
+import { Analytics } from "@vercel/analytics/react";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -34,27 +36,31 @@ const App = () => (
             <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/packages" element={<InvestmentPackages />} />
             <Route path="/faq" element={<FAQ />} />
-            <Route 
-              path="/dashboard" 
+
+            <Route
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route path="/admin" element={<AdminLogin />} />
             <Route path="/admin/login" element={<AdminLogin />} />
-            <Route 
-              path="/admin/dashboard" 
+            <Route
+              path="/admin/dashboard"
               element={
                 <AdminProtectedRoute>
                   <AdminDashboard />
                 </AdminProtectedRoute>
-              } 
+              }
             />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+
+        {/* Add Analytics here */}
+        <Analytics />
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
